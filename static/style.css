@@ -1,0 +1,15 @@
+html, body, #cvs {
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    width: 100%;
+    height: 100%;
+}
+
+body, #cvs {
+    background-color: black;
+}
+
+#cvs {
+    display: block;
+}
