@@ -10,7 +10,6 @@
   "author": "Ben Hess",
   "license": "ISC",
   "devDependencies": {
-    "copy-webpack-plugin": "^12.0.1",
     "ts-loader": "^9.4.1",
     "typescript": "^4.8.4",
     "webpack": "^5.74.0",
