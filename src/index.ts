@@ -109,14 +109,15 @@ void main() {
 
         if(next_vox.x < 0 || next_vox.y < 0 || next_vox.z < 0
             || next_vox.x > 15 || next_vox.y > 15 || next_vox.z > 15) {
-            output_color = multiplier;
             break;
         }
 
         vec4 next_voxel_color = texelFetch(voxelColors, next_vox, 0);
 
         if(next_voxel_color.w != 0.0) {
-            
+            if(next_voxel_color.w > 0.5) {
+                output_color += multiplier * next_voxel_color.xyz * next_voxel_color.w * 3.0;
+            }
             if(rand_float() < 0.01) {
                 direction = normalize(direction + -2.0 * normal * dot(direction, normal));
             }
@@ -130,7 +131,6 @@ void main() {
             voxel_color = next_voxel_color;
         }
     }
-
     vec3 old_color = texture(frame, uv).xyz;
     color = vec4(old_color + (output_color - old_color) * (1.0 / float(frameCount + 1)), 1.0);
 }`;
@@ -154,7 +154,7 @@ void main() {
     color = vec4(pow(c.x, 1.0 / 2.2), pow(c.y, 1.0 / 2.2), pow(c.z, 1.0 / 2.2), 1.0);
 }`;
 
-var position = vec3.create(0, 0, 0);
+var position = vec3.create(8.5, 8.5, 8.5);
 var movement = vec3.create(0, 0, 0);
 var rotationMatrix = mat3.create();
 var pitch = 0;
@@ -279,6 +279,19 @@ function init() : void {
         voxelColorsData[index * 4] = Math.floor(Math.random() * 256);
         voxelColorsData[index * 4 + 1] = Math.floor(Math.random() * 256);
         voxelColorsData[index * 4 + 2] = Math.floor(Math.random() * 256);
+        voxelColorsData[index * 4 + 3] = 0x10;
+    }
+    for(var i = 0; i < 10; i++) {
+        var index = Math.floor(Math.random() * (voxelColorsData.length / 4));
+        if(Math.random() < 0.5) {
+            voxelColorsData[index * 4] = 0xFF;
+            voxelColorsData[index * 4 + 1] = 0x80;
+            voxelColorsData[index * 4 + 2] = 0x05;
+        } else {
+            voxelColorsData[index * 4] = 0xFF;
+            voxelColorsData[index * 4 + 1] = 0xFF;
+            voxelColorsData[index * 4 + 2] = 0xFF;
+        }
         voxelColorsData[index * 4 + 3] = 0xFF;
     }
     voxelColorsTexture = create3DTexture(16, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE, voxelColorsData);
