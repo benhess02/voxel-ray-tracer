@@ -154,11 +154,14 @@ void main() {
     color = vec4(pow(c.x, 1.0 / 2.2), pow(c.y, 1.0 / 2.2), pow(c.z, 1.0 / 2.2), 1.0);
 }`;
 
+var pointerDown = false;
+var lastPointerX : number;
+var lastPointerY : number;
+
 var position = vec3.create(8.5, 8.5, 8.5);
 var movement = vec3.create(0, 0, 0);
 var rotationMatrix = mat3.create();
 var pitch = 0;
-var roll = 0;
 var yaw = 0;
 
 var vertexBuffer : WebGLBuffer;
@@ -336,7 +339,7 @@ function update(time : DOMHighResTimeStamp) {
         vec3.addImm(movement, 0.05, 0, 0);
         frameCount = 0;
     }
-    if(keys.includes("Shift")) {
+    if(keys.includes("shift")) {
         vec3.addImm(movement, 0, -0.05, 0);
         frameCount = 0;
     }
@@ -345,39 +348,14 @@ function update(time : DOMHighResTimeStamp) {
         frameCount = 0;
     }
 
-    if(keys.includes("q")) {
-        yaw -= 0.02;
-        frameCount = 0;
-    }
-    if(keys.includes("e")) {
-        yaw += 0.02;
-        frameCount = 0;
-    }
-    if(keys.includes("r")) {
-        pitch -= 0.02;
-        frameCount = 0;
-    }
-    if(keys.includes("f")) {
-        pitch += 0.02;
-        frameCount = 0;
-    }
-    if(keys.includes("c")) {
-        roll -= 0.02;
-        frameCount = 0;
-    }
-    if(keys.includes("z")) {
-        roll += 0.02;
-        frameCount = 0;
-    }
-
     mat3.reset(rotationMatrix);
-    mat3.rotateZ(rotationMatrix, roll);
-    mat3.rotateX(rotationMatrix, pitch);
     mat3.rotateY(rotationMatrix, yaw);
-
     mat3.multiplyVec(rotationMatrix, movement);
     vec3.add(position, movement);
 
+    mat3.reset(rotationMatrix);
+    mat3.rotateX(rotationMatrix, pitch);
+    mat3.rotateY(rotationMatrix, yaw);
 
     gl.useProgram(pathTracerProgram);
 
@@ -420,15 +398,49 @@ function update(time : DOMHighResTimeStamp) {
 }
 
 document.addEventListener("keydown", (ev) => {
-    if(!keys.includes(ev.key)) {
-        keys.push(ev.key);
+    if(!keys.includes(ev.key.toLowerCase())) {
+        keys.push(ev.key.toLowerCase());
     }
 });
 
 document.addEventListener("keyup", (ev) => {
-    var index = keys.indexOf(ev.key);
+    var index = keys.indexOf(ev.key.toLowerCase());
     if(index >= 0) {
         keys.splice(index, 1);
+    }
+});
+
+cvs.addEventListener("pointerdown", (ev) => {
+    pointerDown = true;
+    lastPointerX = ev.clientX;
+    lastPointerY = ev.clientY;
+});
+
+cvs.addEventListener("pointerup", (ev) => {
+    pointerDown = false;
+});
+
+function screenToRotation(x : number, y : number) : [number, number] {
+    let cameraX = (x - (cvs.width / 2)) / (cvs.height / 2);
+    let cameraY = ((cvs.height - y) - (cvs.height / 2)) / (cvs.height / 2);
+    let d = Math.sqrt(1.5 * 1.5 + cameraX * cameraX);
+    return [Math.atan2(cameraX, 1.5), -Math.atan2(cameraY, d)];
+}
+
+cvs.addEventListener("pointermove", (ev) => {
+    if(pointerDown) {
+        let [newYaw, newPitch] = screenToRotation(ev.clientX, ev.clientY);
+        let [oldYaw, oldPitch] = screenToRotation(lastPointerX, lastPointerY);
+        yaw += oldYaw - newYaw;
+        pitch += oldPitch - newPitch;
+        if(pitch > Math.PI / 2) {
+            pitch = Math.PI / 2;
+        } else if(pitch < -Math.PI / 2) {
+            pitch = -Math.PI / 2;
+        }
+        frameCount = 0;
+        lastPointerX = ev.clientX;
+        lastPointerY = ev.clientY;
     }
 });
 
