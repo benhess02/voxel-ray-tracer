@@ -27,6 +27,9 @@ uniform vec2 outputSize;
 uniform uint rngSeed;
 uniform sampler2D frame;
 uniform int frameCount;
+uniform float focal_length;
+uniform float focal_distance;
+uniform float apature_size;
 in vec2 cameraPoint;
 in vec2 uv;
 out vec4 color;
@@ -63,9 +66,12 @@ vec3 random_in_sphere() {
 void main() {
     rng_state = rngSeed + uint(gl_FragCoord.y) * uint(outputSize.x) + uint(gl_FragCoord.x);
 
-    vec3 direction = normalize(rotation * vec3(cameraPoint.x, cameraPoint.y, 1.5));
-    vec3 ray_pos = position;
-    ivec3 ray_vox = ivec3(position);
+    vec3 focal_point = (vec3(cameraPoint, focal_length) / focal_length) * focal_distance;
+    vec3 apature_point = vec3(random_in_circle() * apature_size, 0.0);
+
+    vec3 direction = normalize(rotation * (focal_point - apature_point));
+    vec3 ray_pos = position + (rotation * apature_point);
+    ivec3 ray_vox = ivec3(ray_pos);
     vec4 voxel_color = texelFetch(voxelColors, ray_vox, 0);
 
     vec3 multiplier = vec3(1.0, 1.0, 1.0);
@@ -177,9 +183,15 @@ var rotationLocation : WebGLUniformLocation;
 var voxelColorsLocation : WebGLUniformLocation;
 var rngSeedLocation : WebGLUniformLocation;
 var pathTracerFrameLocation : WebGLUniformLocation;
+var focalLengthLocation : WebGLUniformLocation;
+var focalDistanceLocation : WebGLUniformLocation;
+var apatureSizeLocation : WebGLUniformLocation;
 var frameCountLocation : WebGLUniformLocation;
 
 var frameCount : number = 0;
+var focalLength : number = 1.15;
+var focalDistance : number = 2;
+var apatureSize : number = 0;
 
 var postProgram : WebGLProgram;
 var frameLocation : WebGLUniformLocation;
@@ -258,6 +270,9 @@ function initShaderPrograms() : void {
     voxelColorsLocation = gl.getUniformLocation(pathTracerProgram, "voxelColors");
     rngSeedLocation = gl.getUniformLocation(pathTracerProgram, "rngSeed");
     pathTracerFrameLocation = gl.getUniformLocation(pathTracerProgram, "frame");
+    focalLengthLocation = gl.getUniformLocation(pathTracerProgram, "focal_length");
+    focalDistanceLocation = gl.getUniformLocation(pathTracerProgram, "focal_distance");
+    apatureSizeLocation = gl.getUniformLocation(pathTracerProgram, "apature_size");
     frameCountLocation = gl.getUniformLocation(pathTracerProgram, "frameCount");
 
     postProgram = compileShaderProgram(postVertex, postFragment);
@@ -348,6 +363,24 @@ function update(time : DOMHighResTimeStamp) {
         frameCount = 0;
     }
 
+    if(keys.includes("+") && apatureSize < 0.5) {
+        apatureSize = Math.min(apatureSize + 0.01, 0.5);
+        frameCount = 0;
+    }
+    if(keys.includes("-") && apatureSize > 0) {
+        apatureSize = Math.max(apatureSize - 0.01, 0);
+        frameCount = 0;
+    }
+
+    if(keys.includes("arrowup") && focalDistance < 10) {
+        focalDistance = Math.min(focalDistance + 0.1, 20);
+        frameCount = 0;
+    }
+    if(keys.includes("arrowdown") && focalDistance > 0.1) {
+        focalDistance = Math.max(focalDistance - 0.1, 0.1);
+        frameCount = 0;
+    }
+
     mat3.reset(rotationMatrix);
     mat3.rotateY(rotationMatrix, yaw);
     mat3.multiplyVec(rotationMatrix, movement);
@@ -362,6 +395,9 @@ function update(time : DOMHighResTimeStamp) {
     gl.uniform2f(outputSizeLocation, cvs.width, cvs.height);
     gl.uniform3fv(positionLocation, position);
     gl.uniformMatrix3fv(rotationLocation, false, rotationMatrix);
+    gl.uniform1f(focalLengthLocation, focalLength);
+    gl.uniform1f(focalDistanceLocation, focalDistance);
+    gl.uniform1f(apatureSizeLocation, apatureSize);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, backTexture);
@@ -420,11 +456,15 @@ cvs.addEventListener("pointerup", (ev) => {
     pointerDown = false;
 });
 
+cvs.addEventListener("pointerleave", (ev) => {
+    pointerDown = false;
+});
+
 function screenToRotation(x : number, y : number) : [number, number] {
     let cameraX = (x - (cvs.width / 2)) / (cvs.height / 2);
     let cameraY = ((cvs.height - y) - (cvs.height / 2)) / (cvs.height / 2);
-    let d = Math.sqrt(1.5 * 1.5 + cameraX * cameraX);
-    return [Math.atan2(cameraX, 1.5), -Math.atan2(cameraY, d)];
+    let d = Math.sqrt(focalLength * focalLength + cameraX * cameraX);
+    return [Math.atan2(cameraX, focalLength), -Math.atan2(cameraY, d)];
 }
 
 cvs.addEventListener("pointermove", (ev) => {
@@ -442,6 +482,15 @@ cvs.addEventListener("pointermove", (ev) => {
         lastPointerX = ev.clientX;
         lastPointerY = ev.clientY;
     }
+});
+
+cvs.addEventListener("wheel", (ev) => {
+    if(ev.deltaY > 0) {
+        focalLength = Math.max(focalLength * 0.97, 0.3);
+    } else {
+        focalLength = Math.min(focalLength * 1.03, 20);
+    }
+    frameCount = 0;
 });
 
 init();
