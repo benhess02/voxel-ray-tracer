@@ -5,7 +5,7 @@ var cvs = <HTMLCanvasElement>document.getElementById("cvs");
 var gl = cvs.getContext("webgl2");
 gl.getExtension("EXT_color_buffer_float");
 
-var raytracerVertex = `#version 300 es
+var pathTracerVertex = `#version 300 es
 uniform vec2 outputSize;
 in vec4 vPosition;
 out vec2 cameraPoint;
@@ -17,7 +17,7 @@ void main() {
     gl_Position = vPosition;
 }`;
 
-var raytracerFragment = `#version 300 es
+var pathTracerFragment = `#version 300 es
 precision highp float;
 precision highp sampler3D;
 uniform vec3 position;
@@ -167,13 +167,13 @@ var keys : string[] = [];
 
 var voxelColorsTexture : WebGLTexture;
 
-var raytracerProgram : WebGLProgram;
+var pathTracerProgram : WebGLProgram;
 var outputSizeLocation : WebGLUniformLocation;
 var positionLocation : WebGLUniformLocation;
 var rotationLocation : WebGLUniformLocation;
 var voxelColorsLocation : WebGLUniformLocation;
 var rngSeedLocation : WebGLUniformLocation;
-var raytracerFrameLocation : WebGLUniformLocation;
+var pathTracerFrameLocation : WebGLUniformLocation;
 var frameCountLocation : WebGLUniformLocation;
 
 var frameCount : number = 0;
@@ -248,14 +248,14 @@ function initFramebuffer() : void {
 }
 
 function initShaderPrograms() : void {
-    raytracerProgram = compileShaderProgram(raytracerVertex, raytracerFragment);
-    outputSizeLocation = gl.getUniformLocation(raytracerProgram, "outputSize");
-    positionLocation = gl.getUniformLocation(raytracerProgram, "position");
-    rotationLocation = gl.getUniformLocation(raytracerProgram, "rotation");
-    voxelColorsLocation = gl.getUniformLocation(raytracerProgram, "voxelColors");
-    rngSeedLocation = gl.getUniformLocation(raytracerProgram, "rngSeed");
-    raytracerFrameLocation = gl.getUniformLocation(raytracerProgram, "frame");
-    frameCountLocation = gl.getUniformLocation(raytracerProgram, "frameCount");
+    pathTracerProgram = compileShaderProgram(pathTracerVertex, pathTracerFragment);
+    outputSizeLocation = gl.getUniformLocation(pathTracerProgram, "outputSize");
+    positionLocation = gl.getUniformLocation(pathTracerProgram, "position");
+    rotationLocation = gl.getUniformLocation(pathTracerProgram, "rotation");
+    voxelColorsLocation = gl.getUniformLocation(pathTracerProgram, "voxelColors");
+    rngSeedLocation = gl.getUniformLocation(pathTracerProgram, "rngSeed");
+    pathTracerFrameLocation = gl.getUniformLocation(pathTracerProgram, "frame");
+    frameCountLocation = gl.getUniformLocation(pathTracerProgram, "frameCount");
 
     postProgram = compileShaderProgram(postVertex, postFragment);
     frameLocation = gl.getUniformLocation(postProgram, "frame");
@@ -379,7 +379,7 @@ function update(time : DOMHighResTimeStamp) {
     vec3.add(position, movement);
 
 
-    gl.useProgram(raytracerProgram);
+    gl.useProgram(pathTracerProgram);
 
     gl.uniform2f(outputSizeLocation, cvs.width, cvs.height);
     gl.uniform3fv(positionLocation, position);
@@ -387,7 +387,7 @@ function update(time : DOMHighResTimeStamp) {
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, backTexture);
-    gl.uniform1i(raytracerFrameLocation, 0);
+    gl.uniform1i(pathTracerFrameLocation, 0);
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_3D, voxelColorsTexture);
