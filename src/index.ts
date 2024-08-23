@@ -6,6 +6,23 @@ import * as pathTracerFragment from "./shaders/pathtrace.frag";
 import * as postVertex from "./shaders/post.vert";
 import * as postFragment from "./shaders/post.frag";
 
+var moreBtn = <HTMLButtonElement>document.getElementById("more-btn");
+var menuContent = <HTMLDivElement>document.getElementById("menu-content");
+var menuExpanded = true;
+var fpsLabel = <HTMLParagraphElement>document.getElementById("fps-label");
+var samplesLabel = <HTMLParagraphElement>document.getElementById("samples-label");
+
+var focalLengthLabel = <HTMLSpanElement>document.getElementById("focal-length-label");
+var focalLengthSlider = <HTMLInputElement>document.getElementById("focal-length-slider");
+var focalDistanceLabel = <HTMLSpanElement>document.getElementById("focal-distance-label");
+var focalDistanceSlider = <HTMLInputElement>document.getElementById("focal-distance-slider");
+var apurtureLabel = <HTMLSpanElement>document.getElementById("apurture-label");
+var apurtureSlider = <HTMLInputElement>document.getElementById("apurture-slider");
+var filmGuageLabel = <HTMLSpanElement>document.getElementById("film-guage-label");
+var filmGuageSlider = <HTMLInputElement>document.getElementById("film-guage-slider");
+
+var lastTime = 0;
+
 var cvs = <HTMLCanvasElement>document.getElementById("cvs");
 var gl = cvs.getContext("webgl2");
 gl.getExtension("EXT_color_buffer_float");
@@ -37,11 +54,13 @@ var focalLengthLocation : WebGLUniformLocation;
 var focalDistanceLocation : WebGLUniformLocation;
 var apatureSizeLocation : WebGLUniformLocation;
 var frameCountLocation : WebGLUniformLocation;
+var filmGuageLocation : WebGLUniformLocation;
 
 var frameCount : number = 0;
-var focalLength : number = 1.15;
+var focalLength : number = 0.015;
 var focalDistance : number = 2;
-var apatureSize : number = 0;
+var fNumber : number = Infinity;
+var filmGuage : number = 0.035;
 
 var postProgram : WebGLProgram;
 var frameLocation : WebGLUniformLocation;
@@ -124,6 +143,7 @@ function initShaderPrograms() : void {
     focalDistanceLocation = gl.getUniformLocation(pathTracerProgram, "focal_distance");
     apatureSizeLocation = gl.getUniformLocation(pathTracerProgram, "apature_size");
     frameCountLocation = gl.getUniformLocation(pathTracerProgram, "frameCount");
+    filmGuageLocation = gl.getUniformLocation(pathTracerProgram, "filmGuage");
 
     postProgram = compileShaderProgram(postVertex, postFragment);
     frameLocation = gl.getUniformLocation(postProgram, "frame");
@@ -187,6 +207,9 @@ function updateSize() {
 function update(time : DOMHighResTimeStamp) {
     requestAnimationFrame(t => update(t));
 
+    var dt = time - lastTime;
+    lastTime = time;
+
     vec3.set(movement, 0, 0, 0);
     if(keys.includes("w")) {
         vec3.addImm(movement, 0, 0, 0.05);
@@ -213,24 +236,6 @@ function update(time : DOMHighResTimeStamp) {
         frameCount = 0;
     }
 
-    if(keys.includes("+") && apatureSize < 0.5) {
-        apatureSize = Math.min(apatureSize + 0.01, 0.5);
-        frameCount = 0;
-    }
-    if(keys.includes("-") && apatureSize > 0) {
-        apatureSize = Math.max(apatureSize - 0.01, 0);
-        frameCount = 0;
-    }
-
-    if(keys.includes("arrowup") && focalDistance < 10) {
-        focalDistance = Math.min(focalDistance + 0.1, 20);
-        frameCount = 0;
-    }
-    if(keys.includes("arrowdown") && focalDistance > 0.1) {
-        focalDistance = Math.max(focalDistance - 0.1, 0.1);
-        frameCount = 0;
-    }
-
     mat3.reset(rotationMatrix);
     mat3.rotateY(rotationMatrix, yaw);
     mat3.multiplyVec(rotationMatrix, movement);
@@ -247,7 +252,13 @@ function update(time : DOMHighResTimeStamp) {
     gl.uniformMatrix3fv(rotationLocation, false, rotationMatrix);
     gl.uniform1f(focalLengthLocation, focalLength);
     gl.uniform1f(focalDistanceLocation, focalDistance);
-    gl.uniform1f(apatureSizeLocation, apatureSize);
+    gl.uniform1f(filmGuageLocation, filmGuage);
+
+    if(fNumber == Infinity) {
+        gl.uniform1f(apatureSizeLocation, 0);
+    } else {
+        gl.uniform1f(apatureSizeLocation, focalLength / fNumber);
+    }
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, backTexture);
@@ -281,6 +292,11 @@ function update(time : DOMHighResTimeStamp) {
     backTexture = tmp;
 
     frameCount += 1;
+
+    if(dt > 0) {
+        fpsLabel.innerText = "FPS: " + Math.round(1000 / dt);
+    }
+    samplesLabel.innerText = "Samples: " + frameCount;
 }
 
 document.addEventListener("keydown", (ev) => {
@@ -311,10 +327,12 @@ cvs.addEventListener("pointerleave", (ev) => {
 });
 
 function screenToRotation(x : number, y : number) : [number, number] {
-    let cameraX = (x - (cvs.width / 2)) / (cvs.height / 2);
-    let cameraY = ((cvs.height - y) - (cvs.height / 2)) / (cvs.height / 2);
-    let d = Math.sqrt(focalLength * focalLength + cameraX * cameraX);
-    return [Math.atan2(cameraX, focalLength), -Math.atan2(cameraY, d)];
+    let scale = (filmGuage * 0.01) / cvs.width;
+    let cameraX = (x - (cvs.width / 2)) * scale;
+    let cameraY = ((cvs.height - y) - (cvs.height / 2)) * scale;
+    let focalLengthMeters = focalLength * 0.01;
+    let d = Math.sqrt(focalLengthMeters * focalLengthMeters + cameraX * cameraX);
+    return [Math.atan2(cameraX, focalLengthMeters), -Math.atan2(cameraY, d)];
 }
 
 cvs.addEventListener("pointermove", (ev) => {
@@ -336,11 +354,73 @@ cvs.addEventListener("pointermove", (ev) => {
 
 cvs.addEventListener("wheel", (ev) => {
     if(ev.deltaY > 0) {
-        focalLength = Math.max(focalLength * 0.97, 0.3);
+        focalLength = Math.max(focalLength - 0.001, 0.005);
     } else {
-        focalLength = Math.min(focalLength * 1.03, 20);
+        focalLength = Math.min(focalLength + 0.001, 0.2);
     }
     frameCount = 0;
+    updateCameraControls();
+});
+
+function updateCameraControls() {
+    focalLengthLabel.innerText = "Focal length: " + (focalLength * 1000).toFixed(0) + "mm";
+    focalLengthSlider.value = (focalLength * 1000).toString();
+
+    focalDistanceLabel.innerText = "Focal distance: " + focalDistance.toFixed(1) + "m";
+    focalDistanceSlider.value = focalDistance.toString();
+
+    if(fNumber == Infinity) {
+        apurtureLabel.innerText = "Apurture: f/∞";
+        apurtureSlider.value = apurtureSlider.max;
+    } else {
+        apurtureLabel.innerText = "Apurture: f/" + fNumber.toFixed(2);
+        apurtureSlider.value = fNumber.toString();
+    }
+
+    filmGuageLabel.innerText = "Film guage: " + (filmGuage * 1000).toFixed(0) + "mm";
+    filmGuageSlider.value = (filmGuage * 1000).toString();
+}
+
+focalLengthSlider.addEventListener("input", () => {
+    focalLength = Number.parseFloat(focalLengthSlider.value) * 0.001;
+    frameCount = 0;
+    updateCameraControls();
+});
+
+focalDistanceSlider.addEventListener("input", () => {
+    focalDistance = Number.parseFloat(focalDistanceSlider.value);
+    frameCount = 0;
+    updateCameraControls();
+});
+
+apurtureSlider.addEventListener("input", () => {
+    if(apurtureSlider.value == apurtureSlider.max) {
+        fNumber = Infinity;
+    } else {
+        fNumber = Number.parseFloat(apurtureSlider.value);
+    }
+    frameCount = 0;
+    updateCameraControls();
+});
+
+filmGuageSlider.addEventListener("input", () => {
+    filmGuage = Number.parseFloat(filmGuageSlider.value) * 0.001;
+    frameCount = 0;
+    updateCameraControls();
+});
+
+moreBtn.addEventListener("click", () => {
+    menuExpanded = !menuExpanded;
+    if(menuExpanded) {
+        moreBtn.innerText = "Close";
+        menuContent.style.display = "block";
+    } else {
+        moreBtn.innerText = "Show more...";
+        menuContent.style.display = "none";
+    }
+
+    // The space key will toggle the menu if this button remains focused
+    moreBtn.blur();
 });
 
 init();
@@ -348,3 +428,5 @@ init();
 window.addEventListener("resize", () => updateSize());
 updateSize();
 update(0);
+
+updateCameraControls();
