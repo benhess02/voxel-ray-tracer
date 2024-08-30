@@ -58,13 +58,14 @@ void main() {
     vec3 focal_point = (vec3(cameraPoint, focal_length) / focal_length) * focal_distance;
     vec3 apature_point = vec3(random_in_circle() * apature_size, 0.0);
 
-    vec3 direction = normalize(rotation * (focal_point - apature_point));
+    vec3 direction = normalize(focal_point - apature_point);
+    vec3 multiplier = vec3(1.0, 1.0, 1.0) * direction.z;
+    vec3 output_color = vec3(0.0, 0.0, 0.0);
+    direction = rotation * direction;
+
     vec3 ray_pos = position + (rotation * apature_point);
     ivec3 ray_vox = ivec3(ray_pos);
     vec4 voxel_color = texelFetch(voxelColors, ray_vox, 0);
-
-    vec3 multiplier = vec3(1.0, 1.0, 1.0);
-    vec3 output_color = vec3(0.0, 0.0, 0.0);
 
     for(int i = 0; i < 48; i++) {
         int next_x = ray_vox.x + (direction.x < 0.0 ? -1 : 1);
