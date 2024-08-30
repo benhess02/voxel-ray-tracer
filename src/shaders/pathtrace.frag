@@ -33,15 +33,23 @@ float rand_float() {
     return float(rand_uint()) / float(4294967295u);
 }
 
-vec2 random_in_circle() {
+vec2 random_on_circle() {
     float angle = rand_float() * 6.28318530718;
-    return vec2(cos(angle), sin(angle)) * sqrt(rand_float());
+    return vec2(cos(angle), sin(angle));
+}
+
+vec2 random_in_circle() {
+    return random_on_circle() * sqrt(rand_float());
+}
+
+vec3 random_on_sphere() {
+    float z = rand_float() * 2.0 - 1.0;
+    float r = sqrt(1.0 - z * z);
+    return vec3(random_on_circle() * r, z);
 }
 
 vec3 random_in_sphere() {
-    float z = rand_float() * 2.0 - 1.0;
-    float r = sqrt(1.0 - z * z);
-    return vec3(random_in_circle() * r, z);
+    return random_on_sphere() * pow(rand_float(), 1.0 / 3.0);
 }
 
 void main() {
